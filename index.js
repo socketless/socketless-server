@@ -27,16 +27,17 @@ class SocketlessServer {
 
     this.instanceId = uuidv4();
 
-    const websocketPort = config.websocketPort || SOCKETLESS_WEBSOCKET_PORT;
-    const restPort = config.restPort || SOCKETLESS_REST_PORT;
+    const websocketPort = config.websocketPort !== undefined ? config.websocketPort : SOCKETLESS_WEBSOCKET_PORT;
+    const restPort = config.restPort !== undefined ? config.restPort : SOCKETLESS_REST_PORT;
 
-    const onMsgUrl = config.onMsgUrl || SOCKETLESS_ON_MSG_URL;
-    const onConnectUrl = config.onConnectUrl || SOCKETLESS_ON_CONNECT_URL;
+    const onMsgUrl = config.onMsgUrl !== undefined ? config.onMsgUrl : SOCKETLESS_ON_MSG_URL;
+    const onConnectUrl = config.onConnectUrl !== undefined ? config.onConnectUrl : SOCKETLESS_ON_CONNECT_URL;
 
     // REST server
-    const rest = express();
-    const restServer = http.createServer(rest);
+    const rest = this._rest = express();
+    const restServer = this._restServer = http.createServer(rest);
 
+    if (restPort)
     restServer.listen(restPort, () => {
       console.log("Listening for internal REST requests on port " + restPort);
     });
@@ -95,7 +96,7 @@ class SocketlessServer {
       wssOpts.port = websocketPort;
 
     // TODO allow optional settings
-    const wss = this.wss = new WebSocket.Server(wssOpts);
+    const wss = this._wss = new WebSocket.Server(wssOpts);
 
     console.log("Listening for WebSocket connections on port " + websocketPort);
 
@@ -113,13 +114,15 @@ class SocketlessServer {
       // REST call to ON_CONNECTION_URL
       console.log('client connect', socketId);
 
-      console.log(onConnectUrl + '?' + querystring.stringify({ sid: socketId }));
-      request(onConnectUrl + '?' + querystring.stringify({ sid: socketId }), (error, response, body) => {
-        if (error)
-          console.log(error);
-        if (body !== 'OK')
-          console.log(body);
-      });
+      if (onConnectUrl) {
+        console.log(onConnectUrl + '?' + querystring.stringify({ sid: socketId }));
+        request(onConnectUrl + '?' + querystring.stringify({ sid: socketId }), (error, response, body) => {
+          if (error)
+            console.log(error);
+          if (body !== 'OK')
+            console.log(body);
+        });
+      }
 
       ws.on('message', message => {
         console.log('received: %s', message);
@@ -140,14 +143,16 @@ class SocketlessServer {
           process.exit();
         }
 
-        console.log(`-> ${url}, body: ${message.substring(0, 20)}`);
-        request.post(reqOpts, (error, response, body) => {
-          console.log(`<- ${url} [${response && response.statusCode}], body: ${body.substring(0, 20)}`);
-          if (error)
-            console.log("    ", error);
-          if (body !== 'OK')
-            console.log("    ", body);
-        });
+        if (onMsgUrl) {
+          console.log(`-> ${url}, body: ${message.substring(0, 20)}`);
+          request.post(reqOpts, (error, response, body) => {
+            console.log(`<- ${url} [${response && response.statusCode}], body: ${body.substring(0, 20)}`);
+            if (error)
+              console.log("    ", error);
+            if (body !== 'OK')
+              console.log("    ", body);
+          });
+        }
       });
 
       // ws.send('something');
