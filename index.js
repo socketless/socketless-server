@@ -155,6 +155,6 @@ class SocketlessServer {
 
   }
 
-};
+}
 
 module.exports = SocketlessServer;
