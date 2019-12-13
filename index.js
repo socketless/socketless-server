@@ -51,6 +51,12 @@ class SocketlessServer {
         this.tags.set(tag, new Set());
 
       this.tags.get(tag).add(socket);
+
+      if (!socket.tags)
+        socket.tags = new Set();
+
+      socket.tags.add(tag);
+
       res.sendStatus(200);
     });
 
@@ -123,6 +129,11 @@ class SocketlessServer {
             console.log(body);
         });
       }
+
+      ws.on('close', () => {
+        if (ws.tags)
+          ws.tags.forEach(tag => this.tags.get(tag).delete(ws));
+      });
 
       ws.on('message', message => {
         console.log('received: %s', message);

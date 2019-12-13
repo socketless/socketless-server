@@ -1,37 +1,68 @@
-const SocketlessServer = require('.');
+const http = require('http');
 const EventEmitter = require('eventemitter3');
+const SocketlessServer = require('.');
 
 class FakeServerWebsocket extends EventEmitter {
 
-  send() {
-    console.log('send XXX TODO', arguments);
+  send(message) {
+    this.clientWs.incoming.push(message);
   }
 
 }
 
 class FakeClientWebsocket {
 
-  constructor({ serverWs }) {
-    this.serverWs = serverWs;
+  constructor() {
+    this.incoming = [];
   }
 
   send(message) {
     this.serverWs.emit('message', message);
   }
 
+  close() {
+    this.closed = true;
+    this.serverWs.emit('close');
+  }
+
 }
 
-class FakeResponse {
+class FakeServerRequest extends EventEmitter {
 
-  status(statusCode) {
-    this.statusCode = statusCode;
+  constructor(options = {}) {
+    super();
+
+    if (typeof options === 'string') {
+      this.url = options;
+      this.method = 'GET';
+    } else {
+      this.url = options.url;
+      this.method = options.method;
+    }
+
+    const that = this;
+
+    const origOn = this.on;
+    this.on = function() {
+      origOn.apply(that, arguments);
+      return that;
+    }
+
+    const origEmit = this.emit;
+    this.emit = function() {
+      origEmit.apply(that, arguments);
+      return that;
+    }
   }
 
-  send(body) {
-    this.body = body;
-  }
+}
 
-  sendStatus(statusCode) {
+function FakeServerResponse() {
+  var res = Object.create(http.ServerResponse.prototype);
+
+  res._headers = {};
+
+  res.sendStatus = function(statusCode) {
     this.status(statusCode);
 
     switch(statusCode) {
@@ -39,9 +70,26 @@ class FakeResponse {
       case 403: this.send('Forbidden'); break;
       case 404: this.send('Not found'); break;
       case 500: this.send('Internal Server Error'); break;
+      default: this.send(statusCode.toString());
     }
   }
 
+  res.send = function send(body) {
+    this.body = body;
+    return this;
+  }
+
+  res.status = function status(code) {
+    this.statusCode = code;
+    return this;
+  }
+
+  res.setHeader = function setHeader(key, val) {
+    console.log(key)
+    this._headers[key] = val;
+  }
+
+  return res;
 }
 
 function testServer(config = {}) {
@@ -52,24 +100,31 @@ function testServer(config = {}) {
 
   const sls = new SocketlessServer(config);
 
-  sls.request = function(req) {
-    const res = new FakeResponse();
+  sls.req = function(reqOpts) {
+    const req = new FakeServerRequest(reqOpts);
+    const res = FakeServerResponse();
 
-    if (typeof req === 'string')
-      req = { url: req, method: 'GET' };
+    //return new Promise((resolve, reject) => {
+    //  function done(err) { if (err) reject(err); else resolve(res); }
 
-    return new Promise((resolve, reject) => {
-      function done(err) { if (err) reject(err); else resolve(); }
-      this._rest._router.handle({ url: '/foo', method: 'GET' }, res, done);
-    });
+    this._rest._router.handle(req, res, () => {});
+    if (reqOpts.body) {
+      req.emit('data', Buffer.from(reqOpts.body));
+      req.emit('end');
+    }
+    return res;
+
+    //});
   }
 
   sls.ws = function() {
     const serverWs = new FakeServerWebsocket();
-    const ws = new FakeClientWebsocket({ serverWs });
+    const clientWs = new FakeClientWebsocket();
+    serverWs.clientWs = clientWs;
+    clientWs.serverWs = serverWs;
 
     sls._wss.emit('connection', serverWs);
-    return ws;
+    return clientWs;
   }
 
   return sls;
@@ -106,5 +161,48 @@ describe('Websockets', () => {
 });
 
 describe('REST API', () => {
+
+  describe("tags", () => {
+
+    it('adds a tag', () => {
+      const sls = testServer();
+      const ws = sls.ws();
+      sls.req('/addTag?sid=0&tag=t');
+
+      const set = sls.tags.get('t');
+      expect(set).toBeInstanceOf(Set);    // tag exists
+      expect(set.size).toBe(1);
+      const socket = Array.from(set)[0];
+      expect(socket).toBe(ws.serverWs);   // and it contains our socket
+    });
+
+    it('sends to that tag', () => {
+      const sls = testServer();
+      const ws = sls.ws();
+      sls.req('/addTag?sid=0&tag=t');
+      sls.req({ url: '/sendToTag?tag=t', method: 'POST', body: 'BODY' });
+      expect(ws.incoming.length).toBe(1);
+      expect(ws.incoming[0]).toBe('BODY');
+    });
+
+    it("doesn't send to other tags", () => {
+      const sls = testServer();
+      const ws = sls.ws();
+      sls.req('/addTag?sid=0&tag=t1');
+      sls.req({ url: '/sendToTag?tag=t2', method: 'POST', body: 'BODY' });
+      expect(ws.incoming.length).toBe(0);
+    });
+
+    it('removes socket from that tag on disconnect', () => {
+      const sls = testServer();
+      const ws = sls.ws();
+      sls.req('/addTag?sid=0&tag=t');
+      ws.close();
+
+      const set = sls.tags.get('t');
+      expect(set.size).toBe(0);
+    });
+
+  });
 
 });
