@@ -4,6 +4,7 @@ const express = require("express");
 const uuidv4 = require('uuid/v4');
 const request = require('request');
 const querystring = require('querystring');
+const debug = require('debug')('socketless');
 
 const SOCKETLESS_WEBSOCKET_PORT = process.env.SOCKETLESS_WEBSOCKET_PORT || 4000;
 const SOCKETLESS_REST_PORT = process.env.SOCKETlESS_REST_PORT || 4000;
@@ -43,7 +44,7 @@ class SocketlessServer {
     });
 
     rest.get('/addTag', (req, res) => {
-      console.log('server addTag', req.query, req.body);
+      debug('/addTag %o', req.query);
       const socket = this.sockets.get(parseInt(req.query.sid));
       const tag = req.query.tag;
 
@@ -61,8 +62,6 @@ class SocketlessServer {
     });
 
     rest.post('/sendToTag', (req, res) => {
-      console.log('server post', req.query, req.body);
-
       const socketsWithTag = this.tags.get(req.query.tag);
 
       if (socketsWithTag) {
@@ -78,6 +77,7 @@ class SocketlessServer {
         .on('data', chunk => body.push(chunk))
         .on('end', () => {
           body = Buffer.concat(body).toString();
+          debug('/sendToTag %o %s', req.query, body);
           socketsWithTag.forEach( ws => ws.send(body) )
         });
       }
@@ -86,7 +86,7 @@ class SocketlessServer {
     });
 
     rest.get('/setMessageData', (req, res) => {
-      console.log('server setMessageData', req.query, req.body);
+      debug('/setMessageData %o', req.query);
       const { sid, key, val } = req.query;
       const socket = this.sockets.get(parseInt(sid));
 
@@ -117,12 +117,14 @@ class SocketlessServer {
       ws.msgData = {};
       ws.msgDataStr = '';
 
-      // REST call to ON_CONNECTION_URL
-      console.log('client connect', socketId);
+      debug('client connect %s', socketId);
 
       if (onConnectUrl) {
-        console.log(onConnectUrl + '?' + querystring.stringify({ sid: socketId }));
+        debug('-> ' + onConnectUrl + '?' + querystring.stringify({ sid: socketId }));
         request(onConnectUrl + '?' + querystring.stringify({ sid: socketId }), (error, response, body) => {
+          debug('<- ' + onConnectUrl + '?' + querystring.stringify({ sid: socketId }));
+          if (error || body !== 'OK')
+            console.log('<- ' + onConnectUrl + '?' + querystring.stringify({ sid: socketId }));
           if (error)
             console.log(error);
           if (body !== 'OK')
@@ -136,7 +138,7 @@ class SocketlessServer {
       });
 
       ws.on('message', message => {
-        console.log('received: %s', message);
+        debug('received: %s', message);
 
         const url = onMsgUrl + '?' + querystring.stringify({ sid: socketId });
 
@@ -149,25 +151,25 @@ class SocketlessServer {
           reqOpts.headers['Content-type'] = 'text/plain';
         } else {
           // application/octet-stream ?
-          console.log('ERROR untested non-string message');
+          console.log('ERROR untested non-string message, ignoring');
           console.log(message);
-          process.exit();
         }
 
         if (onMsgUrl) {
-          console.log(`-> ${url}, body: ${message.substring(0, 20)}`);
+          debug(`-> ${url}, body: ${message.substring(0, 20)}`);
           request.post(reqOpts, (error, response, body) => {
-            console.log(`<- ${url} [${response && response.statusCode}], body: ${body.substring(0, 20)}`);
+            debug(`<- ${url} [${response && response.statusCode}], body: ${body.substring(0, 20)}`);
+            if (error || body !== 'OK')
+              console.log(`<- ${url} [${response && response.statusCode}], body: ${body.substring(0, 20)}`);
             if (error)
               console.log("    ", error);
             if (body !== 'OK')
               console.log("    ", body);
           });
         }
-      });
+      }); /* ws.on('message') */
 
-      // ws.send('something');
-    });
+    }); /* wss.on('connection') */
 
   }
 
