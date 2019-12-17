@@ -85,7 +85,6 @@ function FakeServerResponse() {
   }
 
   res.setHeader = function setHeader(key, val) {
-    console.log(key)
     this._headers[key] = val;
   }
 
@@ -201,6 +200,24 @@ describe('REST API', () => {
 
       const set = sls.tags.get('t');
       expect(set.size).toBe(0);
+    });
+
+  });
+
+  describe('messageData', () => {
+
+    it('should set and send', () => {
+      const sls = testServer({ onMsgUrl: 'onMsgUrl' });
+      const ws = sls.ws();
+      sls.req('/setMessageData?sid=0&key=userId&val=coh');
+      ws.send('BODY');
+
+      const call = request.post.mock.calls[0][0];
+      let msgData = call.headers['X-Socketless-MsgData'];
+      msgData = msgData && JSON.parse(msgData);
+      expect(msgData).toMatchObject({
+        userId: 'coh'
+      });
     });
 
   });

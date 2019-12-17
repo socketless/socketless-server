@@ -104,7 +104,8 @@ class SocketlessServer {
     // TODO allow optional settings
     const wss = this._wss = new WebSocket.Server(wssOpts);
 
-    console.log("Listening for WebSocket connections on port " + websocketPort);
+    if (websocketPort)
+      console.log("Listening for WebSocket connections on port " + websocketPort);
 
     this.sockets = new Map();
     this.socketCounter = 0;
