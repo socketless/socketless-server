@@ -1,6 +1,6 @@
 {
   "name": "socketless-server",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Websocket microservice that routes to / interacts with serverless lambdas",
   "author": "Gadi Cohen <dragon@wastelands.net>",
   "main": "index.js",
