@@ -2,7 +2,9 @@
 
 WIP: A websocket router for serverless apps.  Follow on Github.
 
-[![CircleCI](https://img.shields.io/circleci/build/github/socketless/socketless-server)](https://circleci.com/gh/socketless/socketless-server)
+![npm](https://img.shields.io/npm/v/socketless-server) [![CircleCI](https://img.shields.io/circleci/build/github/socketless/socketless-server)](https://circleci.com/gh/socketless/socketless-server) [![coverage](https://img.shields.io/codecov/c/github/socketless/socketless-server)](https://codecov.io/gh/socketless/socketless-server) ![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)
+
+See https://github.com/socketless/socketless-project.
 
 ## Quick Start
 
