@@ -2,6 +2,8 @@
 
 WIP: A websocket router for serverless apps.  Follow on Github.
 
+[![CircleCI](https://img.shields.io/circleci/build/github/socketless/socketless-server)](https://circleci.com/gh/socketless/socketless-server)
+
 ## Quick Start
 
 ```js
