@@ -134,27 +134,51 @@ jest.mock('request');
 
 describe('Websockets', () => {
 
-  it('requests to onConnectUrl on connect', () => {
-    const sls = testServer({ onConnectUrl: 'onConnectUrl' });
-    sls.ws();
+  describe('events -> lambdas', () => {
 
-    expect(request.mock.calls.length).toBe(1);
-    expect(request.mock.calls[0][0]).toBe('onConnectUrl?sid=0');
+    it('requests to onConnectUrl on connect', () => {
+      const sls = testServer({ onConnectUrl: 'onConnectUrl' });
+      sls.ws();
+
+      expect(request.mock.calls.length).toBe(1);
+      expect(request.mock.calls[0][0]).toBe('onConnectUrl?sid=0');
+    });
+
+    it('requests to onMsgUrl on incoming websocket message', () => {
+      const sls = testServer({ onMsgUrl: 'onMsgUrl' });
+      const ws = sls.ws();
+      ws.send('BODY');
+
+      expect(request.post.mock.calls.length).toBe(1);
+      expect(request.post.mock.calls[0][0]).toMatchObject({
+        url: 'onMsgUrl?sid=0',
+        body: 'BODY',
+        headers: {
+          'Content-type': 'text/plain',
+        }
+      });
+    });
+
   });
 
-  it('requests to onMsgUrl on incoming websocket message', () => {
-    const sls = testServer({ onMsgUrl: 'onMsgUrl' });
-    const ws = sls.ws();
-    ws.send('BODY');
+  describe('SLS requests', () => {
 
-    expect(request.post.mock.calls.length).toBe(1);
-    expect(request.post.mock.calls[0][0]).toMatchObject({
-      url: 'onMsgUrl?sid=0',
-      body: 'BODY',
-      headers: {
-        'Content-type': 'text/plain',
-      }
+    it('should not send requests to onMsgUrl', () => {
+      const sls = testServer({ onMsgUrl: 'onMsgUrl' });
+      const ws = sls.ws();
+      ws.send('SLS ');
+
+      expect(request.post.mock.calls.length).toBe(0);
     });
+
+    it('should respond to PING <data> with PONG <data>', () => {
+      const sls = testServer();
+      const ws = sls.ws();
+      ws.send('SLS PING 123');
+      expect(ws.incoming.length).toBe(1);
+      expect(ws.incoming[0]).toBe('SLS PONG 123');
+    });
+
   });
 
 });

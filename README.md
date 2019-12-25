@@ -27,3 +27,20 @@ SOCKETLESS_REST_PORT=4000
 SOCKETLESS_REST_ALLOW=127.0.0.1
 REDIS_DB=
 ```
+
+## API
+
+### onConnect
+
+### onMsg
+
+### SLS requests
+
+An *incoming* websocket message (from a websocket client, i.e. browser), that
+begins with "SLS " (capital 'SLS' followed by a single space), will not be
+sent to *onMsg* lambdas.  Instead, certain commands will be answered directly
+by the server.
+
+* `SLS PING <payload>`
+  The server will respond to the client with 'SLS PONG <payload>'.  Useful
+  to keep the connection alive and check latency.  Also known as heartbeats.

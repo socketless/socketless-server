@@ -141,6 +141,14 @@ class SocketlessServer {
       ws.on('message', message => {
         debug('received: %s', message);
 
+        if (message.substr(0, 4) === 'SLS ') {
+          if (message.substr(4, 4) === 'PING') {
+            ws.send('SLS PONG ' + message.substr(9));
+          }
+
+          return;
+        }
+
         const url = onMsgUrl + '?' + querystring.stringify({ sid: socketId });
 
         const reqOpts = { url, body: message, headers: {} };
